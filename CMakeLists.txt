@@ -55,13 +55,10 @@ message ("Protobuf generated headers = ${PROTO_HDRS}")
 ## ------------------------------------------
 # Add an executable
 add_library(protobuf_dll SHARED
-    include/pbtools/pbtools.h
-    include/pbtools/pbtools.c
-
     ${PROTO_SRCS}
     ${PROTO_HDRS}
 
-    src/main.cpp
+    src/dllMain.cpp
 )
 
 target_include_directories(protobuf_dll
