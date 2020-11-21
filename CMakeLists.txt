@@ -5,9 +5,12 @@ project (protobuf_dll)
 
 # config
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 set (PROTOBUF_FILES ${CMAKE_CURRENT_SOURCE_DIR}/proto)
-set (PROTOBUF_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/src/proto)
+set (GENERATED_SRC ${CMAKE_CURRENT_SOURCE_DIR}/bin/generated-src)
+set (PROTOBUF_OUTPUT ${GENERATED_SRC}/proto)
 
 # configure protobuf
 find_package(Protobuf REQUIRED)
@@ -22,43 +25,49 @@ file (MAKE_DIRECTORY ${PROTOBUF_OUTPUT}/core)
 file (MAKE_DIRECTORY ${PROTOBUF_OUTPUT}/dto)
 
 message ("Generating Protobuf CPP files from messages")
-file (GLOB EACH_FILE "${PROTOBUF_FILES}/*.proto")
-foreach (PROTO_FILE ${EACH_FILE})
-    file (TO_NATIVE_PATH ${PROTO_FILE} PROTO_NATIVE_FILE)
-    get_filename_component(PROTO_FILENAME ${PROTO_NATIVE_FILE} NAME_WE)
-    execute_process (COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --proto_path=${PROTOBUF_FILES} --cpp_out=${PROTOBUF_OUTPUT}/core ${PROTO_NATIVE_FILE} RESULT_VARIABLE rv)
+file (GLOB FILES "${PROTOBUF_FILES}/*.proto")
+foreach (FILE ${FILES})
+    file (TO_NATIVE_PATH ${FILE} NATIVE_FILE)
+    get_filename_component(PROTO_FILENAME ${NATIVE_FILE} NAME_WE)
+    execute_process (COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} --proto_path=${PROTOBUF_FILES} --cpp_out=${PROTOBUF_OUTPUT}/core ${NATIVE_FILE} RESULT_VARIABLE rv)
     if (${rv})
-         message(FATAL_ERROR "Generation of data model returned ${rv} for proto ${PROTO_NATIVE_FILE}")
+         message(FATAL_ERROR "Generation of data model returned ${rv} for proto ${NATIVE_FILE}")
     endif()
-    execute_process (COMMAND python3 -m pbtools generate_c_source "${PROTO_NATIVE_FILE}" -o "${PROTOBUF_OUTPUT}/dto")
-endforeach (PROTO_FILE)
+    execute_process (COMMAND python3 -m pbtools generate_c_source "${NATIVE_FILE}" -o "${PROTOBUF_OUTPUT}/dto")
+endforeach (FILE)
 
 # organize sources / headers
-file (GLOB_RECURSE EACH_FILE "${PROTOBUF_OUTPUT}/*.cc")
-foreach (C_FILE ${EACH_FILE})
-    file (TO_NATIVE_PATH ${C_FILE} C_NATIVE_FILE)
+file (GLOB_RECURSE FILES "${PROTOBUF_OUTPUT}/*.cc")
+foreach (FILE ${FILES})
+    file (TO_NATIVE_PATH ${FILE} C_NATIVE_FILE)
     list(APPEND PROTO_SRCS "${C_NATIVE_FILE}")
-endforeach (C_FILE)
+endforeach (FILE)
 
-file (GLOB_RECURSE EACH_FILE "${PROTOBUF_OUTPUT}/*.h")
-foreach (C_FILE ${EACH_FILE})
-    file (TO_NATIVE_PATH ${C_FILE} C_NATIVE_FILE)
+file (GLOB_RECURSE FILES "${PROTOBUF_OUTPUT}/*.h")
+foreach (FILE ${FILES})
+    file (TO_NATIVE_PATH ${FILE} C_NATIVE_FILE)
     list(APPEND PROTO_HDRS "${C_NATIVE_FILE}")
-endforeach (C_FILE)
+endforeach (FILE)
 
 message ("Protobuf generated sources = ${PROTO_SRCS}")
 message ("Protobuf generated headers = ${PROTO_HDRS}")
 
 ## ------------------------------------------
 # Add an executable
-add_executable(protobuf_dll
-    src/main.cpp
+add_library(protobuf_dll SHARED
+    include/pbtools/pbtools.h
+    include/pbtools/pbtools.c
+
     ${PROTO_SRCS}
     ${PROTO_HDRS}
+
+    src/main.cpp
 )
 
 target_include_directories(protobuf_dll
     PUBLIC
+    ${GENERATED_SRC}
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/pbtools
     ${PROTOBUF_INCLUDE_DIRS}
     ${CMAKE_CURRENT_BINARY_DIR}
 )
